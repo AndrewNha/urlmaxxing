@@ -1,4 +1,5 @@
 mod bookmarks;
+mod error;
 mod health;
 mod models;
 mod state;

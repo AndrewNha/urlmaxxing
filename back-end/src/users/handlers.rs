@@ -8,6 +8,7 @@ use bcrypt::hash;
 use uuid::Uuid;
 
 use crate::{
+    error::AppError,
     models::{
         register_request::RegisterRequest, replace_user_request::ReplaceUserRequest,
         update_profile_request::UpdateProfileRequest, user::User, user_response::UserResponse,
@@ -21,89 +22,61 @@ fn hash_password(password: &str, cost: u32) -> Result<String, bcrypt::BcryptErro
     hash(password, cost)
 }
 
-pub async fn get_users(State(state): State<AppState>) -> impl IntoResponse {
-    match repository::find_users(&state.pool).await {
-        Ok(users) => (StatusCode::OK, Json(users)).into_response(),
-        Err(e) => {
-            eprintln!("Error fetching users: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error fetching users").into_response()
-        }
-    }
+pub async fn get_users(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let users = repository::find_users(&state.pool).await?;
+    Ok(Json(users))
 }
 
-pub async fn get_user(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
-    match repository::find_user(&state.pool, &id).await {
-        Ok(Some(user)) => (StatusCode::OK, Json(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(e) => {
-            eprintln!("Error fetching user: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error fetching user").into_response()
-        }
-    }
+pub async fn get_user(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    let user = repository::find_user(&state.pool, &id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(user))
 }
 
 pub async fn create_user(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
-) -> impl IntoResponse {
-    let password_hash = match hash_password(&req.password, bcrypt::DEFAULT_COST) {
-        Ok(hash) => hash,
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Error hashing password").into_response();
-        }
-    };
-
+) -> Result<impl IntoResponse, AppError> {
+    let password_hash = hash_password(&req.password, bcrypt::DEFAULT_COST)?;
     let user = User::new(req.display_name, req.username, password_hash);
 
-    match repository::insert_user(&state.pool, &user).await {
-        Ok(_) => (StatusCode::CREATED, Json(UserResponse::from(&user))).into_response(),
-        Err(e) => {
-            eprintln!("Error creating user: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error creating user").into_response()
-        }
-    }
+    repository::insert_user(&state.pool, &user).await?;
+
+    Ok((StatusCode::CREATED, Json(UserResponse::from(&user))))
 }
 
 pub async fn update_user(
     State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(req): Json<UpdateProfileRequest>,
-) -> impl IntoResponse {
-    match repository::save_user(&state.pool, &user_id, &req).await {
-        Ok(Some(user)) => (StatusCode::OK, Json(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(e) => {
-            eprintln!("Error updating user: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error updating user").into_response()
-        }
-    }
+) -> Result<impl IntoResponse, AppError> {
+    let user = repository::save_user(&state.pool, &user_id, &req)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(user))
 }
 
 pub async fn replace_user(
     State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     Json(req): Json<ReplaceUserRequest>,
-) -> impl IntoResponse {
-    match repository::replace_user(&state.pool, &user_id, &req).await {
-        Ok(Some(user)) => (StatusCode::OK, Json(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(e) => {
-            eprintln!("Error replacing user: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error replacing user").into_response()
-        }
-    }
+) -> Result<impl IntoResponse, AppError> {
+    let user = repository::replace_user(&state.pool, &user_id, &req)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(user))
 }
 
 pub async fn delete_user(
     State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
-) -> impl IntoResponse {
-    match repository::remove_user(&state.pool, &user_id).await {
-        Ok(Some(user)) => (StatusCode::OK, Json(user)).into_response(),
-        Ok(None) => (StatusCode::NOT_FOUND, "User not found").into_response(),
-        Err(e) => {
-            eprintln!("Error deleting user: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Error deleting user").into_response()
-        }
-    }
+) -> Result<impl IntoResponse, AppError> {
+    let user = repository::remove_user(&state.pool, &user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(user))
 }
