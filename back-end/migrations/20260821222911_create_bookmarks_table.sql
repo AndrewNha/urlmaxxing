@@ -5,5 +5,5 @@ CREATE TABLE bookmarks (
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     tags TEXT[] NOT NULL,
-    created_at TIMESTAMPTZ
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
