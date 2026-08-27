@@ -2,6 +2,7 @@ pub mod bookmark;
 pub mod bookmark_request;
 pub mod health_response;
 pub mod login_request;
+pub mod login_response;
 pub mod register_request;
 pub mod replace_user_request;
 pub mod update_bookmark_request;

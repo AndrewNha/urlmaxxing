@@ -7,9 +7,12 @@ pub enum AppError {
     // ex: username já cadastrado
     Conflict(String),
     InvalidCredentials,
-    /// falha no hash de senha (bcrypt).
+    // falha no hash de senha (bcrypt)
     Hashing,
-    /// Qualquer outro erro de banco de dados não tratado especificamente.
+    // erro de token
+    TokenError,
+    TokenGenerationError,
+    // erro genérico de banco de dados
     Database(anyhow::Error),
 }
 
@@ -25,6 +28,11 @@ impl IntoResponse for AppError {
             AppError::Hashing => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error processing password".to_string(),
+            ),
+            AppError::TokenError => (StatusCode::UNAUTHORIZED, "Invalid token".to_string()),
+            AppError::TokenGenerationError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error generating token".to_string(),
             ),
             AppError::Database(e) => {
                 eprintln!("Database error: {}", e);
@@ -42,7 +50,7 @@ impl IntoResponse for AppError {
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> Self {
         if let sqlx::Error::Database(db_error) = &error {
-            // Código "23505" = unique_violation no Postgres.
+            // codigo "23505" = unique_violation no postgres
             if db_error.code().as_deref() == Some("23505") {
                 return AppError::Conflict("Resource already exists".to_string());
             }
