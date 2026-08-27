@@ -1,3 +1,4 @@
+mod auth;
 mod bookmarks;
 mod error;
 mod health;
@@ -18,12 +19,15 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
-    let state = AppState { pool };
+    let jwt_secret = env::var("JWT_SECRET")?;
+
+    let state = AppState { pool, jwt_secret };
 
     let app = Router::new()
         .merge(health::router())
         .nest("/users", users::router())
         .nest("/bookmarks", bookmarks::router())
+        .nest("/auth", auth::router())
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
