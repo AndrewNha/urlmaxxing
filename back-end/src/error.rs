@@ -12,6 +12,7 @@ pub enum AppError {
     // erro de token
     TokenError,
     TokenGenerationError,
+    Unauthorized,
     // erro genérico de banco de dados
     Database(anyhow::Error),
 }
@@ -34,6 +35,7 @@ impl IntoResponse for AppError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error generating token".to_string(),
             ),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
             AppError::Database(e) => {
                 eprintln!("Database error: {}", e);
                 (

@@ -1,3 +1,4 @@
+mod extractor;
 mod handlers;
 mod jwt;
 mod repository;
