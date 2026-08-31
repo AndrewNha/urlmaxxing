@@ -10,7 +10,6 @@ pub enum AppError {
     // falha no hash de senha (bcrypt)
     Hashing,
     // erro de token
-    TokenError,
     TokenGenerationError,
     Unauthorized,
     // erro genérico de banco de dados
@@ -30,7 +29,6 @@ impl IntoResponse for AppError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error processing password".to_string(),
             ),
-            AppError::TokenError => (StatusCode::UNAUTHORIZED, "Invalid token".to_string()),
             AppError::TokenGenerationError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error generating token".to_string(),

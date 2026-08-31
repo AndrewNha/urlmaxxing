@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::models::{
     bookmark::Bookmark, bookmark_request::CreateBookmarkRequest,
-    update_bookmark_request::UpdateBookmarkRequest, user,
+    update_bookmark_request::UpdateBookmarkRequest,
 };
 
 pub async fn insert_bookmark(pool: &PgPool, bookmark: &Bookmark) -> Result<()> {
