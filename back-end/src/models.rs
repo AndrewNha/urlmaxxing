@@ -7,6 +7,6 @@ pub mod login_response;
 pub mod register_request;
 pub mod replace_user_request;
 pub mod update_bookmark_request;
-pub mod update_profile_request;
+
 pub mod user;
 pub mod user_response;
