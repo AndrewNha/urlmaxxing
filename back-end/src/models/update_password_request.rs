@@ -10,7 +10,7 @@ pub struct UpdatePasswordRequest {
 
 impl UpdatePasswordRequest {
     pub fn validate(&self) -> Result<(), AppError> {
-        validate_password(&self.current_password)?;
+        validate_password(&self.new_password)?;
         Ok(())
     }
 }

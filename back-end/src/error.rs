@@ -58,7 +58,12 @@ impl From<sqlx::Error> for AppError {
         if let sqlx::Error::Database(db_error) = &error {
             // codigo "23505" = unique_violation no postgres
             if db_error.code().as_deref() == Some("23505") {
-                return AppError::Conflict("Resource already exists".to_string());
+                return match db_error.constraint() {
+                    Some("users_username_key") => {
+                        AppError::Conflict("Username already exists".to_string())
+                    }
+                    _ => AppError::Conflict("Resource already exists".to_string()),
+                };
             }
         }
 

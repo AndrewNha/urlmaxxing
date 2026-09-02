@@ -39,8 +39,9 @@ pub async fn get_user(
 
 pub async fn create_user(
     State(state): State<AppState>,
-    Json(req): Json<RegisterRequest>,
+    Json(mut req): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    req.username = req.username.trim().to_lowercase();
     req.validate()?;
 
     let password_hash = hash_password(&req.password, bcrypt::DEFAULT_COST)?;
@@ -70,11 +71,13 @@ pub async fn replace_user(
     State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     auth_user: AuthUser,
-    Json(req): Json<ReplaceUserRequest>,
+    Json(mut req): Json<ReplaceUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if user_id != *auth_user.user_id() {
         return Err(AppError::Unauthorized);
     }
+    req.username = req.username.trim().to_lowercase();
+    req.validate()?;
 
     let user = repository::replace_user(&state.pool, &user_id, &req)
         .await?

@@ -8,8 +8,10 @@ use bcrypt::verify;
 
 pub async fn login(
     State(state): State<AppState>,
-    Json(req): Json<LoginRequest>,
+    Json(mut req): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    req.username = req.username.trim().to_lowercase();
+
     let user = repository::find_user_by_username(&state.pool, &req.username)
         .await?
         .ok_or(AppError::InvalidCredentials)?;

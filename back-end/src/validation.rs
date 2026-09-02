@@ -11,6 +11,14 @@ pub(crate) fn validate_username(username: &str) -> Result<(), AppError> {
             "Username must be between 3 and 30 characters".to_string(),
         ));
     }
+    let has_only_valid_characters = username
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_');
+    if !has_only_valid_characters {
+        return Err(AppError::ValidationError(
+            "Username must contain only alphanumeric characters or underscores".to_string(),
+        ));
+    }
     Ok(())
 }
 
