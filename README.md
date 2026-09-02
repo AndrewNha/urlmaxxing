@@ -5,7 +5,7 @@
 
 A full-stack application for saving, organizing, and quickly finding useful URLs.
 
-<!-- Homepage screenshot: replace this comment with an image such as ![Urlmaxxing homepage](docs/images/home.png) -->
+![Urlmaxxing homepage](docs/images/home.png)
 
 ## Current features
 
