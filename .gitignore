@@ -1,2 +1,12 @@
 target/
 .env
+
+/front-end/node_modules/
+/front-end/.npm-cache/
+/front-end/dist/
+/front-end/test-results/
+/front-end/playwright-report/
+/front-end/*.tsbuildinfo
+/front-end/.env.local
+/front-end/**/*.log
+/front-end/**/.DS_Store
