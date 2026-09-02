@@ -7,10 +7,17 @@ mod state;
 mod users;
 
 use anyhow::Result;
-use axum::Router;
+use axum::{
+    Router,
+    http::{
+        HeaderValue, Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    },
+};
 use dotenvy::dotenv;
 use sqlx::PgPool;
 use std::env;
+use tower_http::cors::CorsLayer;
 
 use state::AppState;
 
@@ -23,11 +30,26 @@ async fn main() -> Result<()> {
 
     let state = AppState { pool, jwt_secret };
 
+    let cors = CorsLayer::new()
+        .allow_origin([
+            "http://localhost:5173".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1:5173".parse::<HeaderValue>().unwrap(),
+        ])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([CONTENT_TYPE, AUTHORIZATION]);
+
     let app = Router::new()
         .merge(health::router())
         .nest("/users", users::router())
         .nest("/bookmarks", bookmarks::router())
         .nest("/auth", auth::router())
+        .layer(cors)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
