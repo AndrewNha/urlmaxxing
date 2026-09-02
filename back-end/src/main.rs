@@ -5,6 +5,7 @@ mod health;
 mod models;
 mod state;
 mod users;
+mod validation;
 
 use anyhow::Result;
 use axum::{

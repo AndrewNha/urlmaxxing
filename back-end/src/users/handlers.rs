@@ -41,6 +41,8 @@ pub async fn create_user(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    req.validate()?;
+
     let password_hash = hash_password(&req.password, bcrypt::DEFAULT_COST)?;
     let user = User::new(req.username, password_hash);
 
