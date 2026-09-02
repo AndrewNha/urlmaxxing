@@ -1,5 +1,8 @@
 # Urlmaxxing
 
+![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+
 > [!NOTE]
 > Urlmaxxing is still under development. This is a temporary README and will be expanded as the project evolves.
 
