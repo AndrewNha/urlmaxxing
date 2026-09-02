@@ -57,3 +57,22 @@ pub async fn remove_user(pool: &PgPool, user_id: &Uuid) -> Result<Option<UserRes
 
     Ok(user)
 }
+
+pub async fn update_password(
+    pool: &PgPool,
+    user_id: &Uuid,
+    new_password_hash: &str,
+) -> Result<Option<UserResponse>> {
+    let query = "UPDATE users
+         SET password_hash = $1
+         WHERE id = $2
+         RETURNING id, username";
+
+    let user = sqlx::query_as::<_, UserResponse>(query)
+        .bind(new_password_hash)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(user)
+}

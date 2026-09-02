@@ -11,7 +11,8 @@ use crate::{
     error::AppError,
     models::{
         auth_user::AuthUser, register_request::RegisterRequest,
-        replace_user_request::ReplaceUserRequest, user::User, user_response::UserResponse,
+        replace_user_request::ReplaceUserRequest, update_password_request::UpdatePasswordRequest,
+        user::User, user_response::UserResponse,
     },
     state::AppState,
 };
@@ -80,6 +81,30 @@ pub async fn replace_user(
     req.validate()?;
 
     let user = repository::replace_user(&state.pool, &user_id, &req)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(user))
+}
+
+pub async fn update_password(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+    auth_user: AuthUser,
+    Json(req): Json<UpdatePasswordRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    if user_id != *auth_user.user_id() {
+        return Err(AppError::Unauthorized);
+    }
+    if req.current_password == req.new_password {
+        return Err(AppError::ValidationError(
+            "Current password and new password must be different".to_string(),
+        ));
+    }
+    req.validate()?;
+
+    let new_password_hash = bcrypt::hash(&req.new_password, bcrypt::DEFAULT_COST)?;
+
+    let user = repository::update_password(&state.pool, &user_id, &new_password_hash)
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(user))
