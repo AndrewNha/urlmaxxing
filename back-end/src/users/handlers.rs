@@ -1,10 +1,12 @@
+use std::ptr::read;
+
 use axum::{
     Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use bcrypt::hash;
+use bcrypt::{hash, verify};
 use uuid::Uuid;
 
 use crate::{
@@ -95,17 +97,27 @@ pub async fn update_password(
     if user_id != *auth_user.user_id() {
         return Err(AppError::Unauthorized);
     }
+    req.validate()?;
     if req.current_password == req.new_password {
         return Err(AppError::ValidationError(
             "Current password and new password must be different".to_string(),
         ));
     }
-    req.validate()?;
+
+    let current_user = repository::find_user_with_password(&state.pool, auth_user.user_id())
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    let password_matches = verify(&req.current_password, current_user.password_hash())?;
+    if !password_matches {
+        return Err(AppError::InvalidCredentials);
+    }
 
     let new_password_hash = bcrypt::hash(&req.new_password, bcrypt::DEFAULT_COST)?;
 
-    let user = repository::update_password(&state.pool, &user_id, &new_password_hash)
+    let updated_user = repository::update_password(&state.pool, &user_id, &new_password_hash)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(user))
+
+    Ok(Json(updated_user))
 }

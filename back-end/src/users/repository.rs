@@ -76,3 +76,16 @@ pub async fn update_password(
 
     Ok(user)
 }
+
+pub async fn find_user_with_password(pool: &PgPool, user_id: &Uuid) -> Result<Option<User>> {
+    let user = sqlx::query_as::<_, User>(
+        "SELECT id, username, password_hash
+          FROM users
+          WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(user)
+}
