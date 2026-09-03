@@ -64,7 +64,8 @@ pub async fn update_password(
     new_password_hash: &str,
 ) -> Result<Option<UserResponse>> {
     let query = "UPDATE users
-         SET password_hash = $1
+         SET password_hash = $1,
+             token_version = token_version + 1
          WHERE id = $2
          RETURNING id, username";
 

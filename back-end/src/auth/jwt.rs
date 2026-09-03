@@ -48,7 +48,7 @@ pub fn validate_token(
     )?;
 
     Ok(ValidatedToken {
-        user_id: (data.claims.sub),
-        token_version: (data.claims.token_version),
+        user_id: data.claims.sub,
+        token_version: data.claims.token_version,
     })
 }
