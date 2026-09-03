@@ -30,7 +30,7 @@ pub async fn get_bookmark(
     Path(id): Path<Uuid>,
     auth_user: AuthUser,
 ) -> Result<impl IntoResponse, AppError> {
-    let bookmark = repository::find_bookmark(&state.pool, &id, &auth_user.user_id())
+    let bookmark = repository::find_bookmark(&state.pool, &id, auth_user.user_id())
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(bookmark))
