@@ -1,6 +1,7 @@
 pub mod auth_user;
 pub mod bookmark;
 pub mod bookmark_request;
+pub mod delete_user_request;
 pub mod health_response;
 pub mod login_request;
 pub mod login_response;

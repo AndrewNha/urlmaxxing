@@ -1,5 +1,3 @@
-use std::ptr::read;
-
 use axum::{
     Json,
     extract::{Path, State},
@@ -12,9 +10,9 @@ use uuid::Uuid;
 use crate::{
     error::AppError,
     models::{
-        auth_user::AuthUser, register_request::RegisterRequest,
-        replace_user_request::ReplaceUserRequest, update_password_request::UpdatePasswordRequest,
-        user::User, user_response::UserResponse,
+        auth_user::AuthUser, delete_user_request::DeleteUserRequest,
+        register_request::RegisterRequest, replace_user_request::ReplaceUserRequest,
+        update_password_request::UpdatePasswordRequest, user::User, user_response::UserResponse,
     },
     state::AppState,
 };
@@ -59,15 +57,27 @@ pub async fn delete_user(
     State(state): State<AppState>,
     Path(user_id): Path<Uuid>,
     auth_user: AuthUser,
+    Json(req): Json<DeleteUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if user_id != *auth_user.user_id() {
         return Err(AppError::Unauthorized);
     }
 
-    let user = repository::remove_user(&state.pool, &user_id)
+    let current_user = repository::find_user_with_password(&state.pool, &user_id)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(user))
+
+    let password_matches = verify(&req.current_password, current_user.password_hash())?;
+
+    if !password_matches {
+        return Err(AppError::InvalidCredentials);
+    }
+
+    let deleted_user = repository::remove_user(&state.pool, &user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    Ok(Json(deleted_user))
 }
 
 pub async fn replace_user(
