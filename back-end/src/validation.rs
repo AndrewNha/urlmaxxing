@@ -33,5 +33,10 @@ pub(crate) fn validate_password(password: &str) -> Result<(), AppError> {
             "Password must be at least 8 characters".to_string(),
         ));
     }
+    if password.len() > 30 {
+        return Err(AppError::ValidationError(
+            "Password must be at most 30 bytes".to_string(),
+        ));
+    }
     Ok(())
 }
