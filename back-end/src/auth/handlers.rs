@@ -22,7 +22,11 @@ pub async fn login(
         return Err(AppError::InvalidCredentials);
     }
 
-    let token = generate_token(*user.id(), &state.jwt_secret)
+    let token_version = repository::find_token_version(&state.pool, *user.id())
+        .await?
+        .ok_or(AppError::InvalidCredentials)?;
+
+    let token = generate_token(*user.id(), token_version, &state.jwt_secret)
         .map_err(|_| AppError::TokenGenerationError)?;
 
     Ok(Json(LoginResponse {

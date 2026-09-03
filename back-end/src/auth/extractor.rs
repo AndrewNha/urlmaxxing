@@ -1,5 +1,8 @@
 use crate::{
-    auth::jwt::validate_token, error::AppError, models::auth_user::AuthUser, state::AppState,
+    auth::{jwt::validate_token, repository},
+    error::AppError,
+    models::auth_user::AuthUser,
+    state::AppState,
 };
 use axum::{extract::FromRequestParts, http::request::Parts};
 
@@ -20,10 +23,19 @@ impl FromRequestParts<AppState> for AuthUser {
             .strip_prefix("Bearer ") // remove o prefixo "Bearer " do token
             .ok_or(AppError::Unauthorized)?;
 
-        let user_id =
+        let validated_token =
             validate_token(token, &state.jwt_secret).map_err(|_| AppError::Unauthorized)?;
 
-        let auth_user = AuthUser::new(user_id);
+        let current_token_version =
+            repository::find_token_version(&state.pool, validated_token.user_id)
+                .await?
+                .ok_or(AppError::Unauthorized)?;
+
+        if validated_token.token_version != current_token_version {
+            return Err(AppError::Unauthorized);
+        }
+
+        let auth_user = AuthUser::new(validated_token.user_id);
 
         Ok(auth_user)
     }

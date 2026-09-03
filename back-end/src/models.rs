@@ -11,3 +11,4 @@ pub mod update_bookmark_request;
 pub mod update_password_request;
 pub mod user;
 pub mod user_response;
+pub mod validated_token;
