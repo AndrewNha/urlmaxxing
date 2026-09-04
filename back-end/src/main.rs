@@ -22,16 +22,8 @@ use tower_http::cors::CorsLayer;
 
 use state::AppState;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    dotenv().ok();
-
-    let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
-    let jwt_secret = env::var("JWT_SECRET")?;
-
-    let state = AppState { pool, jwt_secret };
-
-    let cors = CorsLayer::new()
+fn create_cors() -> CorsLayer {
+    CorsLayer::new()
         .allow_origin([
             "http://localhost:5173".parse::<HeaderValue>().unwrap(),
             "http://127.0.0.1:5173".parse::<HeaderValue>().unwrap(),
@@ -43,15 +35,29 @@ async fn main() -> Result<()> {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([CONTENT_TYPE, AUTHORIZATION]);
+        .allow_headers([CONTENT_TYPE, AUTHORIZATION])
+}
 
-    let app = Router::new()
+fn create_app(state: AppState, cors: CorsLayer) -> Router {
+    Router::new()
         .merge(health::router())
         .nest("/users", users::router())
         .nest("/bookmarks", bookmarks::router())
         .nest("/auth", auth::router())
         .layer(cors)
-        .with_state(state);
+        .with_state(state)
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    dotenv().ok();
+
+    let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
+    let jwt_secret = env::var("JWT_SECRET")?;
+
+    let state = AppState { pool, jwt_secret };
+    let cors = create_cors();
+    let app = create_app(state, cors);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
