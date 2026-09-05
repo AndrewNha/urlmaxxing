@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use url::Url;
 use uuid::Uuid;
 
 use crate::{
@@ -42,7 +43,14 @@ pub async fn create_bookmark(
     Json(req): Json<CreateBookmarkRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let user_id = *auth_user.user_id();
-    let bookmark = Bookmark::new(user_id, req.title, req.url, req.tags);
+
+    let url = Url::parse(&req.url).map_err(|_| AppError::InvalidUrl)?;
+
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(AppError::InvalidUrl);
+    }
+
+    let bookmark = Bookmark::new(user_id, req.title, url.to_string(), req.tags);
 
     repository::insert_bookmark(&state.pool, &bookmark).await?;
 
@@ -55,6 +63,13 @@ pub async fn update_bookmark(
     auth_user: AuthUser,
     Json(req): Json<UpdateBookmarkRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    if let Some(url) = &req.url {
+        let url = Url::parse(url).map_err(|_| AppError::InvalidUrl)?;
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(AppError::InvalidUrl);
+        }
+    }
+
     let bookmark = repository::save_bookmark(&state.pool, &id, &req, auth_user.user_id())
         .await?
         .ok_or(AppError::NotFound)?;
@@ -67,6 +82,12 @@ pub async fn replace_bookmark(
     auth_user: AuthUser,
     Json(req): Json<CreateBookmarkRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    let url = Url::parse(&req.url).map_err(|_| AppError::InvalidUrl)?;
+
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(AppError::InvalidUrl);
+    }
+
     let bookmark = repository::replace_bookmark(&state.pool, &id, &req, auth_user.user_id())
         .await?
         .ok_or(AppError::NotFound)?;

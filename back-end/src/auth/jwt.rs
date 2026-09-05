@@ -52,3 +52,54 @@ pub fn validate_token(
         token_version: data.claims.token_version,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_token() {
+        assert!(generate_token(Uuid::new_v4(), 0, "secret").is_ok());
+    }
+
+    #[test]
+    fn test_validate_token_with_correct_secret() {
+        let user_id = Uuid::new_v4();
+        let token = generate_token(user_id, 0, "secret").unwrap();
+        let validated_token = validate_token(&token, "secret").unwrap();
+
+        assert_eq!(validated_token.user_id, user_id);
+        assert_eq!(validated_token.token_version, 0);
+    }
+
+    #[test]
+    fn test_validate_token_with_incorrect_secret() {
+        let user_id = Uuid::new_v4();
+        let token = generate_token(user_id, 0, "secret").unwrap();
+
+        assert!(validate_token(&token, "medicina").is_err());
+    }
+
+    #[test]
+    fn test_change_signature() {
+        let user_id = Uuid::new_v4();
+        let token = generate_token(user_id, 0, "secret").unwrap();
+        let mut v = token.split('.').collect::<Vec<_>>();
+        let signature = v[2];
+        let mut new_signature = signature.chars().collect::<Vec<char>>();
+
+        if new_signature[0] == 'a' {
+            new_signature[0] = 'b';
+        } else {
+            new_signature[0] = 'a';
+        }
+
+        let new_signature = new_signature.into_iter().collect::<String>();
+        v[2] = &new_signature;
+
+        let new_token = v.join(".");
+
+        assert_ne!(token, new_token);
+        assert!(validate_token(&new_token, "secret").is_err());
+    }
+}

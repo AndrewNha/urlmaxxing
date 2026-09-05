@@ -28,8 +28,8 @@ impl FromRequestParts<AppState> for AuthUser {
 
         let current_token_version =
             repository::find_token_version(&state.pool, validated_token.user_id)
-                .await?
-                .ok_or(AppError::Unauthorized)?;
+                .await? // propaga erro do banco
+                .ok_or(AppError::Unauthorized)?; //
 
         if validated_token.token_version != current_token_version {
             return Err(AppError::Unauthorized);
