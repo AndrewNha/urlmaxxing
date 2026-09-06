@@ -67,7 +67,7 @@ test("home, auth validation, login, theme, and logout", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toContainText("Username must be at least 3 characters");
   await page.getByLabel("Username").fill("andre");
-  await page.getByLabel("Password").fill("secret1");
+  await page.getByLabel("Password", { exact: true }).fill("secret1");
   await page.getByRole("button", { name: "Show password" }).click();
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/app$/);
@@ -87,13 +87,13 @@ test("bookmark search and CRUD dialogs", async ({ page }) => {
   await page.getByLabel("Search bookmarks").fill("");
   await page.getByRole("button", { name: "New bookmark" }).click();
   await expect(page.getByRole("dialog", { name: "New bookmark" })).toBeVisible();
-  await page.getByLabel("Title").fill("MDN");
-  await page.getByLabel("URL").fill("developer.mozilla.org");
-  await page.getByLabel("Tags").fill("docs, web");
+  await page.getByLabel("Title", { exact: true }).fill("MDN");
+  await page.getByLabel("URL", { exact: true }).fill("developer.mozilla.org");
+  await page.getByLabel("Tags", { exact: true }).fill("docs, web");
   await page.getByRole("button", { name: "Save URL" }).click();
   await expect(page.getByText("Bookmark added successfully.")).toBeVisible();
   await page.getByRole("button", { name: "Edit MDN" }).click();
-  await page.getByLabel("Title").fill("MDN Web Docs");
+  await page.getByLabel("Title", { exact: true }).fill("MDN Web Docs");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Bookmark updated successfully.")).toBeVisible();
   await page.getByRole("button", { name: "Delete MDN Web Docs" }).click();
@@ -107,18 +107,4 @@ test("protected route, retry, and 404 remain usable", async ({ page }) => {
   await page.goto("/does-not-exist");
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
   await expectResponsive(page);
-});
-
-test("visual baselines for home and app", async ({ page }, testInfo) => {
-  const visualViewport = testInfo.project.name.endsWith("375x667") || testInfo.project.name.endsWith("1440x900");
-  test.skip(!visualViewport, "Zen mobile/desktop baselines only");
-  for (const theme of ["light", "dark"] as const) {
-    await page.addInitScript((selectedTheme) => localStorage.setItem("urlmaxxing:theme", selectedTheme), theme);
-    await page.goto("/");
-    await expect(page).toHaveScreenshot(`home-${theme}.png`, { fullPage: true, animations: "disabled" });
-    await authenticate(page);
-    await page.goto("/app");
-    await expect(page.getByText("React documentation")).toBeVisible();
-    await expect(page).toHaveScreenshot(`app-${theme}.png`, { fullPage: true, animations: "disabled" });
-  }
 });

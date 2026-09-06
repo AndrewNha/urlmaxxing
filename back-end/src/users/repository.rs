@@ -1,5 +1,4 @@
-use anyhow::Result;
-use sqlx::PgPool;
+use sqlx::{PgPool, Result};
 use uuid::Uuid;
 
 use crate::models::{

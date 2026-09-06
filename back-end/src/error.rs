@@ -55,18 +55,25 @@ impl IntoResponse for AppError {
     }
 }
 
+fn classify_database_error(code: Option<&str>, constraint: Option<&str>) -> Option<AppError> {
+    // codigo "23505" = unique_violation no postgres
+    if code != Some("23505") {
+        return None;
+    }
+
+    Some(match constraint {
+        Some("users_username_key") => AppError::Conflict("Username already exists".to_string()),
+        _ => AppError::Conflict("Resource already exists".to_string()),
+    })
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> Self {
-        if let sqlx::Error::Database(db_error) = &error {
-            // codigo "23505" = unique_violation no postgres
-            if db_error.code().as_deref() == Some("23505") {
-                return match db_error.constraint() {
-                    Some("users_username_key") => {
-                        AppError::Conflict("Username already exists".to_string())
-                    }
-                    _ => AppError::Conflict("Resource already exists".to_string()),
-                };
-            }
+        if let sqlx::Error::Database(db_error) = &error
+            && let Some(app_error) =
+                classify_database_error(db_error.code().as_deref(), db_error.constraint())
+        {
+            return app_error;
         }
 
         AppError::Database(error.into())
@@ -89,11 +96,13 @@ impl From<anyhow::Error> for AppError {
 mod tests {
     use axum::body::to_bytes;
     use serde_json::{Value, from_slice};
+    use sqlx::PgPool;
+    use uuid::Uuid;
 
     use super::*;
 
     #[tokio::test]
-    async fn test_not_found_status_code() {
+    async fn test_not_found_returns_expected_error() {
         let response = AppError::NotFound.into_response();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -106,7 +115,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conflict_status_code() {
+    async fn test_conflict_returns_expected_error() {
         let response = AppError::Conflict("Username already exists".to_string()).into_response();
 
         assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -119,7 +128,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_unauthorized_status_code() {
+    async fn test_unauthorized_returns_expected_error() {
         let response = AppError::Unauthorized.into_response();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -132,7 +141,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_validation_error_status_code() {
+    async fn test_validation_error_returns_expected_error() {
         let response = AppError::ValidationError("Invalid input".to_string()).into_response();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -145,7 +154,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_invalid_url_status_code() {
+    async fn test_invalid_url_returns_expected_error() {
         let response = AppError::InvalidUrl.into_response();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -158,7 +167,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_database_status_code() {
+    async fn test_database_error_returns_expected_error() {
         let response = AppError::Database(anyhow::anyhow!("Database error")).into_response();
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -171,7 +180,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_hashing_status_code() {
+    async fn test_hashing_error_returns_expected_error() {
         let response = AppError::Hashing.into_response();
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -184,7 +193,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_token_generation_error_status_code() {
+    async fn test_token_generation_error_returns_expected_error() {
         let response = AppError::TokenGenerationError.into_response();
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -197,7 +206,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_invalid_credentials_status_code() {
+    async fn test_invalid_credentials_returns_expected_error() {
         let response = AppError::InvalidCredentials.into_response();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -207,5 +216,71 @@ mod tests {
         let value: Value = from_slice(&bytes).unwrap();
 
         assert_eq!(value, json!({ "error": "Invalid username or password" }));
+    }
+
+    #[test]
+    fn unique_username_violation_becomes_username_conflict() {
+        let error = classify_database_error(Some("23505"), Some("users_username_key"));
+
+        assert!(matches!(
+            error,
+            Some(AppError::Conflict(message))
+                if message == "Username already exists"
+        ));
+    }
+
+    #[test]
+    fn other_unique_violation_becomes_generic_conflict() {
+        let error = classify_database_error(Some("23505"), Some("bookmarks_url_key"));
+
+        assert!(matches!(
+            error,
+            Some(AppError::Conflict(message))
+                if message == "Resource already exists"
+        ));
+    }
+
+    #[test]
+    fn non_unique_violation_is_not_classified_as_conflict() {
+        let error = classify_database_error(Some("23503"), None);
+
+        assert!(error.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn unique_username_returns_conflict(pool: PgPool) {
+        sqlx::query(
+            r#"
+              INSERT INTO users (id, username, password_hash)
+              VALUES ($1, $2, $3)
+              "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind("andre")
+        .bind("hash")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let sqlx_error = sqlx::query(
+            r#"
+              INSERT INTO users (id, username, password_hash)
+              VALUES ($1, $2, $3)
+              "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind("andre")
+        .bind("another_hash")
+        .execute(&pool)
+        .await
+        .unwrap_err();
+
+        let app_error = AppError::from(sqlx_error);
+
+        assert!(matches!(
+            app_error,
+            AppError::Conflict(message)
+                if message == "Username already exists"
+        ));
     }
 }

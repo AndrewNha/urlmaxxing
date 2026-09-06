@@ -8,14 +8,17 @@ const viewports = [
   { name: "1440x900", width: 1440, height: 900 },
 ];
 
-const projects = viewports.map(({ name, width, height }) => ({
-  name: `zen-${name}`,
-  use: {
-    browserName: "firefox" as const,
-    viewport: { width, height },
-    launchOptions: { executablePath: "/usr/bin/zen-browser" },
-  },
-}));
+const browsers = ["chromium", "firefox"] as const;
+
+const projects = browsers.flatMap((browserName) =>
+  viewports.map(({ name, width, height }) => ({
+    name: `${browserName}-${name}`,
+    use: {
+      browserName,
+      viewport: { width, height },
+    },
+  })),
+);
 
 export default defineConfig({
   testDir: "./e2e",

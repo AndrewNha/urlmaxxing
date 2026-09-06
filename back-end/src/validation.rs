@@ -52,22 +52,22 @@ mod tests {
 
     #[test]
     fn test_empty_username() {
-        assert!(
-            validate_username("     ").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Username is required".to_string()))
-        );
+        assert!(validate_username("     ").is_err_and(
+            |e| matches!(e, AppError::ValidationError(message) if message == "Username is required")
+        ));
     }
 
     #[test]
     fn test_not_alphanumeric_username() {
         assert!(
-            validate_username("@-;~´[|ت").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Username must contain only alphanumeric characters or underscores".to_string()))
+            validate_username("@-;~´[|ت").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Username must contain only alphanumeric characters or underscores"))
         );
     }
 
     #[test]
     fn test_short_username() {
         assert!(
-            validate_username("hh").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Username must be between 3 and 30 characters".to_string()))
+            validate_username("hh").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Username must be between 3 and 30 characters"))
         );
     }
 
@@ -79,21 +79,21 @@ mod tests {
     #[test]
     fn test_short_password() {
         assert!(
-            validate_password("1234567").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Password must be at least 8 characters".to_string()))
+            validate_password("1234567").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Password must be at least 8 characters"))
         );
     }
 
     #[test]
     fn test_empty_password() {
-        assert!(
-            validate_password("").is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Password is required".to_string()))
-        );
+        assert!(validate_password("").is_err_and(
+            |e| matches!(e, AppError::ValidationError(message) if message == "Password is required")
+        ));
     }
 
     #[test]
     fn test_large_password() {
         assert!(
-            validate_password(&"a".repeat(31).to_string()).is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Password must be at most 30 bytes".to_string()))
+            validate_password(&"a".repeat(31).to_string()).is_err_and(|e| matches!(e, AppError::ValidationError(message) if message == "Password must be at most 30 bytes"))
         );
     }
 }
