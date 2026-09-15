@@ -1,15 +1,27 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "@/App";
-import { TOKEN_KEY, USER_KEY } from "@/lib/storage";
 
 function renderAt(path: string, authenticated = false) {
-  if (authenticated) {
-    localStorage.setItem(TOKEN_KEY, "test-token");
-    localStorage.setItem(USER_KEY, JSON.stringify({ id: "user-1", username: "andre" }));
-  }
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url.endsWith("/auth/me")) {
+      return authenticated
+        ? new Response(JSON.stringify({ id: "user-1", username: "andre" }), { status: 200, headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+    }
+
+    if (url.endsWith("/auth/logout") && init?.method === "POST") {
+      return new Response(null, { status: 204 });
+    }
+
+    return new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
   window.history.replaceState({}, "", path);
-  return render(<App />);
+  return { ...render(<App />), fetchMock };
 }
 
 describe("brand and authenticated navigation", () => {
@@ -21,9 +33,8 @@ describe("brand and authenticated navigation", () => {
   });
 
   it("uses app navigation everywhere for an authenticated user", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } })));
     renderAt("/", true);
-    expect(screen.getByRole("link", { name: "Urlmaxxing home" })).toHaveAttribute("href", "/app");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Urlmaxxing home" })).toHaveAttribute("href", "/app"));
     expect(screen.getByRole("link", { name: "View my bookmarks" })).toHaveAttribute("href", "/app");
     expect(screen.queryByRole("link", { name: "Get started" })).not.toBeInTheDocument();
   });
@@ -36,13 +47,16 @@ describe("brand and authenticated navigation", () => {
 
   it("toggles theme and signs out with announced controls", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } })));
-    renderAt("/app", true);
+    const { fetchMock } = renderAt("/app", true);
+    await screen.findByRole("button", { name: "Sign out" });
     await user.click(screen.getByRole("button", { name: "Use dark theme" }));
     expect(document.documentElement).toHaveClass("dark");
     await user.click(screen.getByRole("button", { name: "Sign out" }));
-    expect(window.location.pathname).toBe("/login");
-    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+    await waitFor(() => expect(window.location.pathname).toBe("/login"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/logout"),
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
   });
 });
 
@@ -50,7 +64,7 @@ describe("authentication form", () => {
   it("validates fields and toggles password visibility", async () => {
     const user = userEvent.setup();
     renderAt("/login");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(await screen.findByRole("button", { name: "Sign in" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Username must be at least 3 characters");
     const password = screen.getByLabelText("Password");
     expect(password).toHaveAttribute("type", "password");

@@ -4,9 +4,10 @@ use axum::http::StatusCode;
 use common::{PASSWORD, create_user, test_server};
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use tower_cookies::cookie::SameSite;
 
 #[sqlx::test(migrations = "./migrations")]
-async fn login_returns_token_and_public_user(pool: PgPool) {
+async fn login_returns_session_cookie_and_public_user(pool: PgPool) {
     let server = test_server(pool);
     let user = create_user(&server, "username", PASSWORD).await;
 
@@ -16,12 +17,24 @@ async fn login_returns_token_and_public_user(pool: PgPool) {
         .await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
+
+    let cookie = response.maybe_cookie("session");
+    let cookie = match cookie {
+        Some(c) => c,
+        None => panic!("Cookie not found"),
+    };
+
+    let token = cookie.value();
+    assert!(!token.is_empty());
+
+    assert_eq!(cookie.name(), "session");
+    assert_eq!(cookie.path(), Some("/"));
+    assert_eq!(cookie.domain(), None);
+    assert_eq!(cookie.http_only(), Some(true));
+    assert_eq!(cookie.same_site(), Some(SameSite::Lax));
+
     let body = response.json::<Value>();
-    assert!(
-        body["token"]
-            .as_str()
-            .is_some_and(|token| !token.is_empty())
-    );
+
     assert_eq!(body["user"], user);
     assert!(body["user"].get("password").is_none());
     assert!(body["user"].get("password_hash").is_none());
@@ -102,15 +115,12 @@ async fn tampered_token_returns_unauthorized(pool: PgPool) {
         .post("/auth/login")
         .json(&json!({ "username": "username", "password": PASSWORD }))
         .await;
-    let mut token = login_response.json::<Value>()["token"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let mut token = login_response.cookie("session").value().to_string();
     token.push('x');
 
     let response = server
         .get(&format!("/users/{}", user["id"].as_str().unwrap()))
-        .authorization_bearer(token)
+        .add_cookie(tower_cookies::Cookie::new("session", token))
         .await;
 
     assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);

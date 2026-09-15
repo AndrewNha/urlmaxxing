@@ -5,12 +5,18 @@ use axum_test::TestServer;
 use common::{PASSWORD, authenticated_user, test_server};
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use tower_cookies::Cookie;
 use uuid::Uuid;
 
-async fn create_bookmark(server: &TestServer, token: &str, title: &str, url: &str) -> Value {
+async fn create_bookmark(
+    server: &TestServer,
+    session_cookie: &Cookie<'static>,
+    title: &str,
+    url: &str,
+) -> Value {
     let response = server
         .post("/bookmarks")
-        .authorization_bearer(token)
+        .add_cookie(session_cookie.clone())
         .json(&json!({
             "title": title,
             "url": url,
@@ -25,9 +31,14 @@ async fn create_bookmark(server: &TestServer, token: &str, title: &str, url: &st
 #[sqlx::test(migrations = "./migrations")]
 async fn create_bookmark_returns_created_and_persists_it(pool: PgPool) {
     let server = test_server(pool.clone());
-    let (user, token) = authenticated_user(&server, "username").await;
-
-    let bookmark = create_bookmark(&server, &token, "Rust", "https://www.rust-lang.org").await;
+    let (user, session_cookie) = authenticated_user(&server, "username").await;
+    let bookmark = create_bookmark(
+        &server,
+        &session_cookie,
+        "Rust",
+        "https://www.rust-lang.org",
+    )
+    .await;
 
     assert_eq!(bookmark["user_id"], user["id"]);
     assert_eq!(bookmark["title"], "Rust");
@@ -44,7 +55,7 @@ async fn create_bookmark_returns_created_and_persists_it(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn create_bookmark_without_token_returns_unauthorized(pool: PgPool) {
+async fn create_bookmark_without_session_returns_unauthorized(pool: PgPool) {
     let server = test_server(pool.clone());
 
     let response = server
@@ -69,12 +80,12 @@ async fn create_bookmark_without_token_returns_unauthorized(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn create_bookmark_rejects_invalid_url(pool: PgPool) {
     let server = test_server(pool.clone());
-    let (_, token) = authenticated_user(&server, "username").await;
+    let (_, session_cookie) = authenticated_user(&server, "username").await;
 
     for url in ["not-a-url", "ftp://example.com"] {
         let response = server
             .post("/bookmarks")
-            .authorization_bearer(&token)
+            .add_cookie(session_cookie.clone())
             .json(&json!({ "title": "Invalid", "url": url, "tags": [] }))
             .await;
 
@@ -92,16 +103,34 @@ async fn create_bookmark_rejects_invalid_url(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn list_bookmarks_returns_only_authenticated_users_items(pool: PgPool) {
     let server = test_server(pool);
-    let (_, first_token) = authenticated_user(&server, "first_user").await;
-    let first = create_bookmark(&server, &first_token, "First", "https://one.example").await;
-    let second = create_bookmark(&server, &first_token, "Second", "https://two.example").await;
+    let (_, first_session_cookie) = authenticated_user(&server, "first_user").await;
+    let first = create_bookmark(
+        &server,
+        &first_session_cookie,
+        "First",
+        "https://one.example",
+    )
+    .await;
+    let second = create_bookmark(
+        &server,
+        &first_session_cookie,
+        "Second",
+        "https://two.example",
+    )
+    .await;
 
-    let (_, other_token) = authenticated_user(&server, "other_user").await;
-    create_bookmark(&server, &other_token, "Other", "https://other.example").await;
+    let (_, other_session_cookie) = authenticated_user(&server, "other_user").await;
+    create_bookmark(
+        &server,
+        &other_session_cookie,
+        "Other",
+        "https://other.example",
+    )
+    .await;
 
     let response = server
         .get("/bookmarks")
-        .authorization_bearer(first_token)
+        .add_cookie(first_session_cookie)
         .await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
@@ -115,14 +144,20 @@ async fn list_bookmarks_returns_only_authenticated_users_items(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn get_bookmark_returns_owned_item_and_hides_other_users_item(pool: PgPool) {
     let server = test_server(pool);
-    let (_, owner_token) = authenticated_user(&server, "owner").await;
-    let bookmark = create_bookmark(&server, &owner_token, "Owned", "https://owned.example").await;
-    let (_, other_token) = authenticated_user(&server, "other").await;
+    let (_, owner_session_cookie) = authenticated_user(&server, "owner").await;
+    let bookmark = create_bookmark(
+        &server,
+        &owner_session_cookie,
+        "Owned",
+        "https://owned.example",
+    )
+    .await;
+    let (_, other_session_cookie) = authenticated_user(&server, "other").await;
     let bookmark_id = bookmark["id"].as_str().unwrap();
 
     let owned_response = server
         .get(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(owner_token)
+        .add_cookie(owner_session_cookie)
         .await;
     assert_eq!(owned_response.status_code(), StatusCode::OK);
     let owned = owned_response.json::<Value>();
@@ -134,7 +169,7 @@ async fn get_bookmark_returns_owned_item_and_hides_other_users_item(pool: PgPool
 
     let other_response = server
         .get(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(other_token)
+        .add_cookie(other_session_cookie)
         .await;
     assert_eq!(other_response.status_code(), StatusCode::NOT_FOUND);
     assert_eq!(
@@ -146,13 +181,13 @@ async fn get_bookmark_returns_owned_item_and_hides_other_users_item(pool: PgPool
 #[sqlx::test(migrations = "./migrations")]
 async fn patch_bookmark_updates_only_sent_fields(pool: PgPool) {
     let server = test_server(pool);
-    let (_, token) = authenticated_user(&server, "username").await;
-    let bookmark = create_bookmark(&server, &token, "Old", "https://old.example").await;
+    let (_, session_cookie) = authenticated_user(&server, "username").await;
+    let bookmark = create_bookmark(&server, &session_cookie, "Old", "https://old.example").await;
     let bookmark_id = bookmark["id"].as_str().unwrap();
 
     let response = server
         .patch(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({ "title": "New" }))
         .await;
 
@@ -168,13 +203,13 @@ async fn patch_bookmark_updates_only_sent_fields(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn replace_bookmark_updates_all_mutable_fields(pool: PgPool) {
     let server = test_server(pool);
-    let (_, token) = authenticated_user(&server, "username").await;
-    let bookmark = create_bookmark(&server, &token, "Old", "https://old.example").await;
+    let (_, session_cookie) = authenticated_user(&server, "username").await;
+    let bookmark = create_bookmark(&server, &session_cookie, "Old", "https://old.example").await;
     let bookmark_id = bookmark["id"].as_str().unwrap();
 
     let response = server
         .put(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({
             "title": "New",
             "url": "https://new.example/path",
@@ -194,13 +229,14 @@ async fn replace_bookmark_updates_all_mutable_fields(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn delete_bookmark_removes_it(pool: PgPool) {
     let server = test_server(pool.clone());
-    let (_, token) = authenticated_user(&server, "username").await;
-    let bookmark = create_bookmark(&server, &token, "Delete", "https://delete.example").await;
+    let (_, session_cookie) = authenticated_user(&server, "username").await;
+    let bookmark =
+        create_bookmark(&server, &session_cookie, "Delete", "https://delete.example").await;
     let bookmark_id = bookmark["id"].as_str().unwrap();
 
     let response = server
         .delete(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(&token)
+        .add_cookie(session_cookie.clone())
         .await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
@@ -220,7 +256,7 @@ async fn delete_bookmark_removes_it(pool: PgPool) {
 
     let get_response = server
         .get(&format!("/bookmarks/{bookmark_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .await;
     assert_eq!(get_response.status_code(), StatusCode::NOT_FOUND);
 }
@@ -228,13 +264,19 @@ async fn delete_bookmark_removes_it(pool: PgPool) {
 #[sqlx::test(migrations = "./migrations")]
 async fn deleting_user_cascades_to_bookmarks(pool: PgPool) {
     let server = test_server(pool.clone());
-    let (user, token) = authenticated_user(&server, "username").await;
-    create_bookmark(&server, &token, "Cascade", "https://cascade.example").await;
+    let (user, session_cookie) = authenticated_user(&server, "username").await;
+    create_bookmark(
+        &server,
+        &session_cookie,
+        "Cascade",
+        "https://cascade.example",
+    )
+    .await;
     let user_id = user["id"].as_str().unwrap();
 
     let response = server
         .delete(&format!("/users/{user_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({ "current_password": PASSWORD }))
         .await;
     assert_eq!(response.status_code(), StatusCode::OK);

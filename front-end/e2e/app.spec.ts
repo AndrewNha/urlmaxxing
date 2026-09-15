@@ -9,13 +9,27 @@ const initialBookmark = {
   created_at: "2026-01-02T12:00:00.000Z",
 };
 
+const authStates = new WeakMap<Page, { authenticated: boolean }>();
+
 async function mockApi(page: Page) {
   let bookmarks = [initialBookmark];
+  const authState = { authenticated: false };
+  authStates.set(page, authState);
   await page.route("http://localhost:3000/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path === "/auth/me") {
+      return authState.authenticated
+        ? route.fulfill({ json: { id: "user-1", username: "andre" } })
+        : route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+    }
     if (path === "/auth/login") {
-      return route.fulfill({ json: { token: "test-token", user: { id: "user-1", username: "andre" } } });
+      authState.authenticated = true;
+      return route.fulfill({ json: { user: { id: "user-1", username: "andre" } } });
+    }
+    if (path === "/auth/logout") {
+      authState.authenticated = false;
+      return route.fulfill({ status: 204, body: "" });
     }
     if (path === "/users") return route.fulfill({ json: { id: "user-1", username: "andre" } });
     if (path === "/bookmarks" && request.method() === "GET") return route.fulfill({ json: bookmarks });
@@ -38,10 +52,9 @@ async function mockApi(page: Page) {
 }
 
 async function authenticate(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem("urlmaxxing:token", "test-token");
-    localStorage.setItem("urlmaxxing:user", JSON.stringify({ id: "user-1", username: "andre" }));
-  });
+  const authState = authStates.get(page);
+  if (!authState) throw new Error("API mock must be installed before authentication");
+  authState.authenticated = true;
 }
 
 async function expectResponsive(page: Page) {
@@ -92,10 +105,13 @@ test("bookmark search and CRUD dialogs", async ({ page }) => {
   await page.getByLabel("Tags", { exact: true }).fill("docs, web");
   await page.getByRole("button", { name: "Save URL" }).click();
   await expect(page.getByText("Bookmark added successfully.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "New bookmark" })).toBeHidden();
   await page.getByRole("button", { name: "Edit MDN" }).click();
+  await expect(page.getByRole("dialog", { name: "Edit bookmark" })).toBeVisible();
   await page.getByLabel("Title", { exact: true }).fill("MDN Web Docs");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Bookmark updated successfully.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Edit bookmark" })).toBeHidden();
   await page.getByRole("button", { name: "Delete MDN Web Docs" }).click();
   await page.getByRole("button", { name: "Delete permanently" }).click();
   await expect(page.getByText("Bookmark deleted.")).toBeVisible();

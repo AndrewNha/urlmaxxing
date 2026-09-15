@@ -80,12 +80,12 @@ async fn invalid_user_returns_bad_request_and_is_not_persisted(pool: PgPool) {
 async fn get_user_returns_authenticated_user(pool: PgPool) {
     let server = test_server(pool);
     let user = create_user(&server, "username", PASSWORD).await;
-    let token = login(&server, "username", PASSWORD).await;
+    let session_cookie = login(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
 
     let response = server
         .get(&format!("/users/{user_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .await;
 
     assert_eq!(response.status_code(), StatusCode::OK);
@@ -93,7 +93,7 @@ async fn get_user_returns_authenticated_user(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn get_user_without_token_returns_unauthorized(pool: PgPool) {
+async fn get_user_without_session_returns_unauthorized(pool: PgPool) {
     let server = test_server(pool);
     let user = create_user(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
@@ -108,11 +108,11 @@ async fn get_user_without_token_returns_unauthorized(pool: PgPool) {
 async fn get_another_user_returns_unauthorized(pool: PgPool) {
     let server = test_server(pool);
     create_user(&server, "username", PASSWORD).await;
-    let token = login(&server, "username", PASSWORD).await;
+    let session_cookie = login(&server, "username", PASSWORD).await;
 
     let response = server
         .get(&format!("/users/{}", Uuid::new_v4()))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .await;
 
     assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);
@@ -122,12 +122,12 @@ async fn get_another_user_returns_unauthorized(pool: PgPool) {
 async fn replace_user_updates_username(pool: PgPool) {
     let server = test_server(pool.clone());
     let user = create_user(&server, "username", PASSWORD).await;
-    let token = login(&server, "username", PASSWORD).await;
+    let session_cookie = login(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
 
     let response = server
         .put(&format!("/users/{user_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({ "username": "  New_Username  " }))
         .await;
 
@@ -143,16 +143,16 @@ async fn replace_user_updates_username(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn update_password_replaces_hash_and_invalidates_old_token(pool: PgPool) {
+async fn update_password_replaces_hash_and_invalidates_old_session(pool: PgPool) {
     let server = test_server(pool.clone());
     let user = create_user(&server, "username", PASSWORD).await;
-    let old_token = login(&server, "username", PASSWORD).await;
+    let old_session_cookie = login(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
     let new_password = "new_password123";
 
     let response = server
         .patch(&format!("/users/{user_id}/password"))
-        .authorization_bearer(&old_token)
+        .add_cookie(old_session_cookie.clone())
         .json(&json!({
             "current_password": PASSWORD,
             "new_password": new_password,
@@ -161,11 +161,11 @@ async fn update_password_replaces_hash_and_invalidates_old_token(pool: PgPool) {
 
     assert_eq!(response.status_code(), StatusCode::OK);
 
-    let old_token_response = server
+    let old_session_response = server
         .get(&format!("/users/{user_id}"))
-        .authorization_bearer(old_token)
+        .add_cookie(old_session_cookie)
         .await;
-    assert_eq!(old_token_response.status_code(), StatusCode::UNAUTHORIZED);
+    assert_eq!(old_session_response.status_code(), StatusCode::UNAUTHORIZED);
 
     let password_hash: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = $1")
         .bind(Uuid::parse_str(user_id).unwrap())
@@ -181,12 +181,12 @@ async fn update_password_replaces_hash_and_invalidates_old_token(pool: PgPool) {
 async fn update_password_with_wrong_current_password_returns_unauthorized(pool: PgPool) {
     let server = test_server(pool);
     let user = create_user(&server, "username", PASSWORD).await;
-    let token = login(&server, "username", PASSWORD).await;
+    let session_cookie = login(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
 
     let response = server
         .patch(&format!("/users/{user_id}/password"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({
             "current_password": "wrong_password",
             "new_password": "new_password123",
@@ -204,12 +204,12 @@ async fn update_password_with_wrong_current_password_returns_unauthorized(pool: 
 async fn delete_user_removes_authenticated_user(pool: PgPool) {
     let server = test_server(pool.clone());
     let user = create_user(&server, "username", PASSWORD).await;
-    let token = login(&server, "username", PASSWORD).await;
+    let session_cookie = login(&server, "username", PASSWORD).await;
     let user_id = user["id"].as_str().unwrap();
 
     let response = server
         .delete(&format!("/users/{user_id}"))
-        .authorization_bearer(token)
+        .add_cookie(session_cookie)
         .json(&json!({ "current_password": PASSWORD }))
         .await;
 
