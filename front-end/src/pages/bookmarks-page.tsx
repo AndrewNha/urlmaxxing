@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookmarkPlus, Plus, RefreshCw, Search } from "lucide-react";
 import { BookmarkCard } from "@/components/bookmarks/bookmark-card";
@@ -26,6 +26,7 @@ export function BookmarksPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
+  const noticeTimerRef = useRef<number | null>(null);
 
   const loadBookmarks = useCallback(async () => {
     setLoading(true);
@@ -41,6 +42,10 @@ export function BookmarksPage() {
   }, []);
 
   useEffect(() => { void loadBookmarks(); }, [loadBookmarks]);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+  }, []);
 
   const filteredBookmarks = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("en-US");
@@ -65,8 +70,12 @@ export function BookmarksPage() {
   }
 
   function showNotice(message: string) {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 3000);
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNotice("");
+      noticeTimerRef.current = null;
+    }, 3000);
   }
 
   async function saveBookmark(input: BookmarkInput) {

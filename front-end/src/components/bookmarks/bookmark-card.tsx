@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, ExternalLink, Link2, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,10 @@ interface BookmarkCardProps {
   onDelete: (bookmark: Bookmark) => void;
 }
 
-export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) {
+export const BookmarkCard = forwardRef<HTMLElement, BookmarkCardProps>(function BookmarkCard(
+  { bookmark, onEdit, onDelete },
+  ref,
+) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
 
@@ -31,7 +34,7 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
   }
 
   return (
-    <motion.article layout initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.22 }} className="min-w-0">
+    <motion.article ref={ref} layout initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.22 }} className="min-w-0">
       <Card className="group h-full min-w-0 overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-lg">
         <CardContent className="flex h-full min-w-0 flex-col p-5">
           <div className="mb-4 flex min-w-0 items-start gap-3">
@@ -64,4 +67,4 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
       </Card>
     </motion.article>
   );
-}
+});
