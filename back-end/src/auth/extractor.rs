@@ -1,10 +1,11 @@
 use crate::{
-    auth::{jwt::validate_token, repository},
+    auth::{cookie::AUTH_COOKIE_NAME, jwt::validate_token, repository},
     error::AppError,
     models::auth_user::AuthUser,
     state::AppState,
 };
 use axum::{extract::FromRequestParts, http::request::Parts};
+use tower_cookies::Cookies;
 
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
@@ -13,15 +14,15 @@ impl FromRequestParts<AppState> for AuthUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let header = parts
-            .headers
-            .get("Authorization")
-            .ok_or(AppError::Unauthorized)?;
-        let header = header.to_str().map_err(|_| AppError::Unauthorized)?;
+        let cookies = Cookies::from_request_parts(parts, state)
+            .await
+            .map_err(|_| AppError::Unauthorized)?;
 
-        let token = header
-            .strip_prefix("Bearer ") // remove o prefixo "Bearer " do token
+        let cookie = cookies
+            .get(AUTH_COOKIE_NAME)
             .ok_or(AppError::Unauthorized)?;
+
+        let token = cookie.value();
 
         let validated_token =
             validate_token(token, &state.jwt_secret).map_err(|_| AppError::Unauthorized)?;

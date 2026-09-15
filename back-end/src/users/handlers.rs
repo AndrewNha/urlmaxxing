@@ -5,9 +5,11 @@ use axum::{
     response::IntoResponse,
 };
 use bcrypt::{hash, verify};
+use tower_cookies::Cookies;
 use uuid::Uuid;
 
 use crate::{
+    auth::cookie::build_removal_cookie,
     error::AppError,
     models::{
         auth_user::AuthUser, delete_user_request::DeleteUserRequest,
@@ -55,6 +57,7 @@ pub async fn create_user(
 
 pub async fn delete_user(
     State(state): State<AppState>,
+    cookies: Cookies,
     Path(user_id): Path<Uuid>,
     auth_user: AuthUser,
     Json(req): Json<DeleteUserRequest>,
@@ -76,6 +79,9 @@ pub async fn delete_user(
     let deleted_user = repository::remove_user(&state.pool, &user_id)
         .await?
         .ok_or(AppError::NotFound)?;
+
+    let cookie = build_removal_cookie(state.cookie_secure);
+    cookies.remove(cookie);
 
     Ok(Json(deleted_user))
 }
@@ -100,6 +106,7 @@ pub async fn replace_user(
 
 pub async fn update_password(
     State(state): State<AppState>,
+    cookies: Cookies,
     Path(user_id): Path<Uuid>,
     auth_user: AuthUser,
     Json(req): Json<UpdatePasswordRequest>,
@@ -128,6 +135,9 @@ pub async fn update_password(
     let updated_user = repository::update_password(&state.pool, &user_id, &new_password_hash)
         .await?
         .ok_or(AppError::NotFound)?;
+
+    let cookie = build_removal_cookie(state.cookie_secure);
+    cookies.remove(cookie);
 
     Ok(Json(updated_user))
 }

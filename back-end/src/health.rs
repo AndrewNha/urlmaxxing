@@ -25,7 +25,12 @@ mod tests {
             .connect_lazy("postgres://user:123@localhost:5432/database_test")
             .unwrap();
         let jwt_secret = "med".to_string();
-        let state = AppState { pool, jwt_secret };
+        let cookie_secure = false;
+        let state = AppState {
+            pool,
+            jwt_secret,
+            cookie_secure,
+        };
 
         let app = router().with_state(state);
         let client = TestServer::new(app);

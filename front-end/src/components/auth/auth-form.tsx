@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
@@ -15,15 +15,27 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const routeState = location.state as { from?: string; notice?: string } | null;
+  const [intendedRoute] = useState(routeState?.from);
+  const [notice, setNotice] = useState(routeState?.notice ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!routeState?.notice) return;
+    navigate(location.pathname, {
+      replace: true,
+      state: routeState.from ? { from: routeState.from } : null,
+    });
+  }, [location.pathname, navigate, routeState]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setNotice("");
     const cleanUsername = username.trim();
     if (cleanUsername.length < 3) {
       setError("Username must be at least 3 characters.");
@@ -43,8 +55,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const credentials = { username: cleanUsername, password };
       if (isLogin) await login(credentials);
       else await register(credentials);
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from?.startsWith("/") ? from : "/app", { replace: true });
+      navigate(intendedRoute?.startsWith("/") ? intendedRoute : "/app", { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to continue.");
     } finally {
@@ -62,6 +73,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {notice && <Alert variant="success">{notice}</Alert>}
           {error && <Alert>{error}</Alert>}
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
@@ -69,7 +81,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <PasswordInput id="password" name="password" autoComplete={isLogin ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 6 characters" required minLength={6} disabled={loading} />
+            <PasswordInput id="password" name="password" autoComplete={isLogin ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" required minLength={8} disabled={loading} />
           </div>
           {!isLogin && (
             <div className="space-y-2">

@@ -10,6 +10,7 @@ import { HomePage } from "@/pages/home-page";
 import { LoginPage } from "@/pages/login-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { RegisterPage } from "@/pages/register-page";
+import { AccountPage } from "@/pages/account-page";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
                 </Route>
                 <Route element={<ProtectedRoute />}>
                   <Route path="app" element={<BookmarksPage />} />
+                  <Route path="account" element={<AccountPage />} />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

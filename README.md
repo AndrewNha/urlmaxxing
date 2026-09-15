@@ -12,13 +12,15 @@ A full-stack application for saving, organizing, and quickly finding useful URLs
 
 ## Current features
 
-- Account registration and JWT-based authentication
+- Account registration and cookie-based sessions
+- Account username, password, and deletion settings
 - Private bookmark collections for each user
 - Create, view, edit, and delete bookmarks
 - Organize bookmarks with optional tags
 - Search by title, URL, or tag
 - Responsive interface with light and dark themes
 - Loading, empty, success, and error feedback states
+- Configurable per-IP rate limiting
 
 ## Technologies
 
@@ -36,11 +38,10 @@ Docker and Docker Compose support the API and database environment. Database cha
 
 ## Implementation overview
 
-The React front end communicates with a REST API built with Axum. Authentication uses JSON Web Tokens, passwords are stored as bcrypt hashes, and protected operations associate each bookmark with its authenticated owner. PostgreSQL provides persistent storage through SQLx.
+The React front end communicates with a REST API built with Axum. Authentication uses JSON Web Tokens stored in HttpOnly cookies, passwords are stored as bcrypt hashes, and protected operations associate each bookmark with its authenticated owner. PostgreSQL provides persistent storage through SQLx. The API applies configurable global and authentication-specific per-IP request limits.
 
 ## Planned improvements
 
-- Rate limiting
 - Stronger password rules
 - More complete username rules and validation
 - Additional security, usability, and documentation improvements

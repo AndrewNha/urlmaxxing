@@ -2,7 +2,7 @@ use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::user::User;
+use crate::models::{user::User, user_response::UserResponse};
 
 pub async fn find_user_by_username(pool: &PgPool, username: &str) -> Result<Option<User>> {
     let query = "SELECT id, username, password_hash FROM users WHERE username = $1";
@@ -23,4 +23,13 @@ pub async fn find_token_version(pool: &PgPool, user_id: Uuid) -> Result<Option<i
         .await?;
 
     Ok(token_version)
+}
+
+pub async fn find_user(pool: &PgPool, user_id: Uuid) -> Result<Option<UserResponse>> {
+    let user = sqlx::query_as::<_, UserResponse>("SELECT id, username FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(user)
 }

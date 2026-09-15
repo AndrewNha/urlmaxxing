@@ -2,7 +2,7 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode}
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::validated_token::ValidatedToken;
+use crate::{auth::cookie::SESSION_DURATION_SECONDS, models::validated_token::ValidatedToken};
 
 #[derive(Serialize, Deserialize)]
 struct Claims {
@@ -17,7 +17,7 @@ impl Claims {
 
         Self {
             sub: user_id,
-            exp: now + 300,
+            exp: now + (SESSION_DURATION_SECONDS as usize),
             token_version,
         }
     }

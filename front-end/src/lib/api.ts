@@ -1,5 +1,3 @@
-import { TOKEN_KEY } from "@/lib/storage";
-
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
 
 interface ApiOptions extends Omit<RequestInit, "body"> {
@@ -25,6 +23,7 @@ function getErrorMessage(status: number) {
     404: "The requested item was not found.",
     409: "This username is already taken.",
     422: "The submitted data could not be validated.",
+    429: "Too many requests. Wait a moment and try again.",
     500: "The server encountered an error. Try again.",
   };
   return messages[status] ?? "The request could not be completed.";
@@ -32,12 +31,11 @@ function getErrorMessage(status: number) {
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { authenticated = false, body, headers, ...requestOptions } = options;
-  const token = localStorage.getItem(TOKEN_KEY);
   const response = await fetch(`${API_URL}${path}`, {
     ...requestOptions,
+    credentials: "include",
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(authenticated && token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -51,7 +49,11 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     : await response.text().catch(() => "");
 
   if (!response.ok) {
-    if (response.status === 401 && authenticated) {
+    const serverError = typeof data === "object" && data !== null && "error" in data
+      ? String(data.error)
+      : "";
+
+    if (response.status === 401 && authenticated && serverError === "Unauthorized") {
       window.dispatchEvent(new Event("urlmaxxing:unauthorized"));
     }
     throw new ApiError(getErrorMessage(response.status), response.status);

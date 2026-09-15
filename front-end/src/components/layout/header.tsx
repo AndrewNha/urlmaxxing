@@ -1,4 +1,4 @@
-import { Bookmark, LogOut, Moon, Sun } from "lucide-react";
+import { Bookmark, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ export function Header() {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     navigate("/login", { replace: true });
   }
 
@@ -30,6 +30,9 @@ export function Header() {
               </span>
               <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
                 <Link to="/app"><Bookmark className="size-4" /><span className="hidden xs:inline sm:inline">Bookmarks</span></Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
+                <Link to="/account"><UserRound className="size-4" /><span className="hidden sm:inline">Account</span></Link>
               </Button>
               <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Sign out">
                 <LogOut className="size-4" />
