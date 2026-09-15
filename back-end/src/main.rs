@@ -9,6 +9,8 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+
     let jwt_secret = env::var("JWT_SECRET")?;
     let cookie_secure = env::var("COOKIE_SECURE")?.parse::<bool>()?;
     let rate_limit_settings = RateLimitSettings {
