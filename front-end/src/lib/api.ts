@@ -1,4 +1,5 @@
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+const DEFAULT_API_URL = import.meta.env.PROD ? "/api" : "http://localhost:3000";
+const API_URL = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
 
 interface ApiOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
