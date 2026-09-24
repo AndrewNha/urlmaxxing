@@ -27,14 +27,15 @@ async fn main() -> Result<()> {
     let cors = create_cors();
     let app = create_app(state, cors, rate_limit_settings);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let port = env::var("PORT").unwrap_or_else(|_| "3000".into());
+    let address = format!("0.0.0.0:{port}");
+    let listener = tokio::net::TcpListener::bind(&address).await?;
 
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await
-    .unwrap();
+    .await?;
 
     Ok(())
 }

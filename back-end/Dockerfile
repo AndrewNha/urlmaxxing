@@ -1,9 +1,8 @@
-FROM rust:1.97.1 as builder
+FROM rust:1.97.1-bookworm AS builder
 WORKDIR /usr/src/app
 COPY . .
 RUN cargo build --release
 
-FROM debian:bullseye-slim
-RUN apt-get update && rm -rf /var/lib/apt/lists/*
+FROM debian:bookworm-slim
 COPY --from=builder /usr/src/app/target/release/back-end /usr/local/back-end
 CMD ["/usr/local/back-end"]
