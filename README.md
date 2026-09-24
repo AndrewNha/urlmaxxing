@@ -8,6 +8,10 @@
 
 Urlmaxxing is a full-stack application for saving, organizing, and quickly finding useful URLs. Each account has a private bookmark collection protected by a cookie-based session.
 
+## Live application
+
+[Open Urlmaxxing](https://urlmaxxing.vercel.app/)
+
 ![Urlmaxxing homepage](docs/images/home.png)
 
 ## Features
